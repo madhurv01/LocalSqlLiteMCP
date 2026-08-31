@@ -1,0 +1,18 @@
+# Normalize line endings to LF on checkin
+* text=auto eol=lf
+
+# Shell scripts must stay LF
+*.sh text eol=lf
+
+# Binary assets
+*.db binary
+*.sqlite binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Keep the lockfile out of language stats / diffs
+package-lock.json linguist-generated=true -diff
+drizzle/**/*.sql linguist-generated=true

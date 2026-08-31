@@ -1,0 +1,39 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# next.js / build output
+/.next/
+/out/
+/build
+/dist
+*.tsbuildinfo
+next-env.d.ts
+
+# runtime data (app metadata DB, snapshots, sandbox scratch files)
+/data/
+/databases/*
+!/databases/.gitkeep
+!/databases/demo.db
+
+# sqlite sidecar files (never commit these)
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+*.db-journal
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# misc
+*.log
+coverage/
+.DS_Store
+Thumbs.db
+.vercel
+.idea/
+*.pem

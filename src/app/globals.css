@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 20% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 20% 12%;
+    --primary: 246 60% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 16% 95%;
+    --secondary-foreground: 222 20% 20%;
+    --muted: 220 16% 95%;
+    --muted-foreground: 220 10% 42%;
+    --accent: 246 60% 96%;
+    --accent-foreground: 246 60% 35%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 60% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --border: 220 16% 88%;
+    --input: 220 16% 88%;
+    --ring: 246 60% 55%;
+    --radius: 0.65rem;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .dark {
+    --background: 224 24% 8%;
+    --foreground: 220 16% 92%;
+    --card: 224 22% 11%;
+    --card-foreground: 220 16% 92%;
+    --primary: 250 75% 68%;
+    --primary-foreground: 224 24% 8%;
+    --secondary: 223 18% 17%;
+    --secondary-foreground: 220 16% 88%;
+    --muted: 223 18% 16%;
+    --muted-foreground: 220 12% 60%;
+    --accent: 250 40% 20%;
+    --accent-foreground: 250 75% 82%;
+    --destructive: 0 62% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 55% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 90% 55%;
+    --warning-foreground: 224 24% 8%;
+    --border: 223 16% 20%;
+    --input: 223 16% 22%;
+    --ring: 250 75% 68%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 999px;
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+pre code {
+  font-family: var(--font-mono);
+}
