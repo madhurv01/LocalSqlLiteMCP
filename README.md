@@ -1,3 +1,11 @@
+
+<img
+    src="LocalDBAgent.png"
+    alt="Build Your Own Agent Now - n8n AI Agents"
+    width="100%"
+  />
+
+
 # LocalDB Agent
 
 **Git for AI database operations.** A local-first AI database operator that connects to
