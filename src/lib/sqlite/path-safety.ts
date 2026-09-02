@@ -45,7 +45,3 @@ export function resolveDbPath(input: string): string {
   }
   return abs;
 }
-
-export function isInsideDbRoot(abs: string): boolean {
-  return underRoot(resolve(abs), config.dbRoot);
-}

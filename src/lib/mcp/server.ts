@@ -1,6 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { toolRegistry, type ToolName } from "./tools";
+import { toolRegistry } from "./tools";
 
 /**
  * Build an MCP server exposing the same capability layer the app uses.
@@ -45,14 +44,4 @@ export function buildMcpServer(): McpServer {
   }
 
   return server;
-}
-
-// Re-export so tooling can introspect JSON schemas without a running server.
-export function toolJsonSchemas() {
-  return Object.fromEntries(
-    (Object.keys(toolRegistry) as ToolName[]).map((name) => [
-      name,
-      zodToJsonSchema(toolRegistry[name].schema, name),
-    ]),
-  );
 }

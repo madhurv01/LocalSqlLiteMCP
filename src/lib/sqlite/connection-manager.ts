@@ -54,14 +54,3 @@ export function closeUserDb(userPath: string) {
     }
   }
 }
-
-export function closeAll() {
-  for (const db of pool.values()) {
-    try {
-      db.close();
-    } catch {
-      /* ignore */
-    }
-  }
-  pool.clear();
-}

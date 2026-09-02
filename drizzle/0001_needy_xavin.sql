@@ -1,1 +1,0 @@
-ALTER TABLE `operations` ADD `preview_result` text;

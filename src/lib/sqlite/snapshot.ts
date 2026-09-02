@@ -51,11 +51,3 @@ export function restoreSnapshot(snapshotPath: string, targetPath: string): void 
   copyFileSync(snapshotPath, targetPath);
   logger.info("snapshot restored", { snapshotPath, targetPath });
 }
-
-export function deleteSnapshotFile(filePath: string): void {
-  try {
-    if (existsSync(filePath)) unlinkSync(filePath);
-  } catch (err) {
-    logger.warn("failed to delete snapshot", { filePath, err: String(err) });
-  }
-}

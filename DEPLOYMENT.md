@@ -18,7 +18,6 @@ serverless edge.
 git clone <repo> && cd localdb-agent
 npm ci
 npm run build
-npm run db:migrate
 
 export NODE_ENV=production
 export LOCALDB_DATA_DIR=/var/lib/localdb-agent
@@ -87,17 +86,12 @@ location / {
 
 Caddy needs no special config (`reverse_proxy 127.0.0.1:3000`).
 
-## 4. Migrations
+## 4. Schema
 
-The app self-bootstraps its metadata schema on first run, so it works immediately. For
-controlled upgrades use Drizzle:
-
-```bash
-npm run db:generate    # after editing src/lib/db/schema.ts
-npm run db:migrate     # apply to $APP_DB_PATH
-```
-
-Migration files live in `drizzle/` and are committed to the repo.
+The app metadata schema (`$LOCALDB_DATA_DIR/app.db`) is created on first run and kept
+current by idempotent additive migrations in `src/lib/db/app-db.ts` — no separate
+migration command. When you add a column, extend both `BOOTSTRAP_SQL` and
+`runInlineMigrations` there (and the Drizzle view in `src/lib/db/schema.ts`).
 
 ## 5. Backups
 

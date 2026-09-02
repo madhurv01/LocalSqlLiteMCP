@@ -10,8 +10,9 @@ let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 let _sqlite: Database.Database | null = null;
 
 /**
- * Lightweight bootstrap so the app runs on first launch even before
- * `npm run db:migrate`. Mirrors drizzle schema.ts.
+ * The app metadata schema. Created on first launch and kept in sync by the
+ * additive migrations in `runInlineMigrations`. Mirrors `schema.ts`, which is
+ * the Drizzle query-builder view of these same tables.
  */
 const BOOTSTRAP_SQL = `
 CREATE TABLE IF NOT EXISTS databases (
@@ -111,11 +112,6 @@ function runInlineMigrations(db: Database.Database) {
   } catch {
     /* fresh db — columns already present via bootstrap */
   }
-}
-
-export function getAppSqlite(): Database.Database {
-  getAppDb();
-  return _sqlite!;
 }
 
 export { schema };

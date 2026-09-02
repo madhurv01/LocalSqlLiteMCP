@@ -68,9 +68,11 @@ Open the app, connect `demo.db`, and try:
 
 ```bash
 npm run build
-npm run db:migrate            # apply Drizzle migrations to the app metadata DB
-node .next/standalone/server.js
+npm start                     # node .next/standalone/server.js
 ```
+
+The app metadata database is created and kept up to date automatically on first
+run — there is no separate migration step.
 
 ### Docker
 
@@ -219,9 +221,8 @@ auto-snapshot, `confirmDestructive` required for destructive SQL), `restore_snap
 |---|---|
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm run seed` | build `databases/demo.db` |
-| `npm run db:generate` / `db:migrate` / `db:studio` | Drizzle |
 | `npm run mcp:stdio` | standalone MCP server |
-| `npm test` / `test:watch` | Vitest (safety model, path safety, full pipeline) |
+| `npm test` / `test:watch` | Vitest (safety, path safety, sandbox, pipeline, branching, planner) |
 | `npm run typecheck` / `lint` | TypeScript / ESLint |
 
 ## Tests
