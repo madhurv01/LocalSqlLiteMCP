@@ -34,7 +34,10 @@ export function openUserDb(userPath: string, opts: OpenOptions = {}): Database.D
     readonly: opts.readonly ?? false,
     fileMustExist: !opts.create,
   });
-  db.pragma("journal_mode = WAL");
+  if (!opts.readonly) {
+    // journal_mode is a write; only safe on a writable connection.
+    db.pragma("journal_mode = WAL");
+  }
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 4000");
   pool.set(key, db);

@@ -23,6 +23,12 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Database file is missing on disk" }, { status: 410 });
   }
 
+  const branch = repo.getActiveBranch(databaseId);
+  const databasePath = branch?.filePath ?? database.path;
+  if (!existsSync(databasePath)) {
+    return Response.json({ error: `Branch "${branch?.name}" file is missing` }, { status: 410 });
+  }
+
   let conversationId = parsed.data.conversationId;
   if (!conversationId || !repo.listConversations(databaseId).some((c) => c.id === conversationId)) {
     conversationId = repo.createConversation(databaseId, message.slice(0, 60)).id;
@@ -40,7 +46,8 @@ export async function POST(req: NextRequest) {
   const persisting = teeAndPersist(
     runPipeline({
       databaseId,
-      databasePath: database.path,
+      databasePath,
+      branchId: branch?.id ?? null,
       conversationId,
       message,
       history,

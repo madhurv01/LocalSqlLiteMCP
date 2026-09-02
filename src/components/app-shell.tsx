@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Database,
   GitBranch,
@@ -21,13 +22,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ConnectDialog } from "@/components/connect-dialog";
 import { CommandPalette, type PaletteAction } from "@/components/command-palette";
+import { BranchSwitcher } from "@/components/branch-switcher";
+import { BranchPanel } from "@/components/branch-panel";
 import { SchemaExplorer } from "@/components/schema-explorer";
 import { OperationHistory, type OperationSummary } from "@/components/operation-history";
 import { AssistantMessage, UserMessage } from "@/components/chat-message";
 import { jsonFetch, streamAgent } from "@/lib/client-api";
 import { emptyTurn, reduceTurn, turnFromMeta, type AgentTurn } from "@/lib/turn";
 import { suggestFollowUps } from "@/lib/suggest";
-import type { SchemaSnapshot } from "@/lib/types";
+import type { BranchView, SchemaSnapshot } from "@/lib/types";
 import { cn, relativeTime } from "@/lib/utils";
 
 interface DbRow {
@@ -72,6 +75,7 @@ export function AppShell() {
   const [activeConv, setActiveConv] = useState<string | null>(null);
   const [messages, setMessages] = useState<MsgRow[]>([]);
   const [operations, setOperations] = useState<OperationSummary[]>([]);
+  const [branches, setBranches] = useState<BranchView[]>([]);
   const [cfg, setCfg] = useState<ConfigInfo | null>(null);
   const [input, setInput] = useState("");
   const [liveTurn, setLiveTurn] = useState<AgentTurn | null>(null);
@@ -123,6 +127,15 @@ export function AppShell() {
     setOperations(r.operations);
   }, []);
 
+  const refreshBranches = useCallback(async (dbId: string) => {
+    try {
+      const r = await jsonFetch<{ branches: BranchView[] }>(`/api/databases/${dbId}/branches`);
+      setBranches(r.branches);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const loadMessages = useCallback(async (convId: string) => {
     const r = await jsonFetch<{ messages: MsgRow[] }>(`/api/conversations/${convId}`);
     setMessages(r.messages);
@@ -136,6 +149,7 @@ export function AppShell() {
       setLiveTurn(null);
       await refreshSchema(dbId);
       await refreshOps(dbId);
+      await refreshBranches(dbId);
       const r = await jsonFetch<{ conversations: ConvRow[] }>(
         `/api/conversations?databaseId=${dbId}`,
       );
@@ -147,8 +161,78 @@ export function AppShell() {
         setActiveConv(null);
       }
     },
-    [loadMessages, refreshOps, refreshSchema],
+    [loadMessages, refreshOps, refreshSchema, refreshBranches],
   );
+
+  const activeBranch = useMemo(() => branches.find((b) => b.isActive) ?? null, [branches]);
+
+  async function switchBranch(branchId: string) {
+    if (!activeDb || busy) return;
+    setBusy(true);
+    try {
+      const r = await jsonFetch<{ branch: { name: string }; branches: BranchView[] }>(
+        `/api/databases/${activeDb}/branches/${branchId}/activate`,
+        { method: "POST", body: "{}" },
+      );
+      setBranches(r.branches);
+      setLiveTurn(null);
+      await refreshSchema(activeDb);
+      await refreshOps(activeDb);
+      notify(`Switched to ${r.branch.name}`);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createBranch(name: string) {
+    if (!activeDb) return;
+    setBusy(true);
+    try {
+      const r = await jsonFetch<{ branch: { id: string; name: string }; branches: BranchView[] }>(
+        `/api/databases/${activeDb}/branches`,
+        { method: "POST", body: JSON.stringify({ name }) },
+      );
+      setBranches(r.branches);
+      notify(`Created branch ${r.branch.name} — switching…`);
+      await switchBranch(r.branch.id);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  }
+
+  async function discardBranch(branchId: string) {
+    if (!activeDb) return;
+    if (!confirm("Discard this branch and its database file? This cannot be undone.")) return;
+    setBusy(true);
+    try {
+      const r = await jsonFetch<{ switchedTo: string | null; branches: BranchView[] }>(
+        `/api/databases/${activeDb}/branches/${branchId}`,
+        { method: "DELETE" },
+      );
+      setBranches(r.branches);
+      if (r.switchedTo) {
+        await refreshSchema(activeDb);
+        await refreshOps(activeDb);
+        notify("Branch discarded — back on main");
+      } else {
+        notify("Branch discarded");
+      }
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function afterMerge() {
+    if (!activeDb) return;
+    await refreshBranches(activeDb);
+    await refreshSchema(activeDb);
+    await refreshOps(activeDb);
+  }
 
   const selectConv = useCallback(
     async (id: string) => {
@@ -217,6 +301,7 @@ export function AppShell() {
       if (activeDb) {
         await refreshSchema(activeDb);
         await refreshOps(activeDb);
+        await refreshBranches(activeDb);
         const r = await jsonFetch<{ conversations: ConvRow[] }>(
           `/api/conversations?databaseId=${activeDb}`,
         );
@@ -431,15 +516,23 @@ export function AppShell() {
           Git for AI database operations
         </span>
         <div className="ml-auto flex items-center gap-2">
+          {activeDb && branches.length > 0 && (
+            <BranchSwitcher
+              branches={branches}
+              busy={busy}
+              onSwitch={switchBranch}
+              onCreate={createBranch}
+            />
+          )}
           {cfg && (
             <span
               className={cn(
-                "hidden items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] md:inline-flex",
+                "hidden items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] lg:inline-flex",
                 cfg.usingFallback ? "text-warning" : "text-muted-foreground",
               )}
               title={`Configured: ${cfg.configuredProvider}`}
             >
-              <Server className="h-3 w-3" /> planner: {cfg.activeProvider}
+              <Server className="h-3 w-3" /> {cfg.activeProvider}
               {cfg.usingFallback && " (fallback)"}
             </span>
           )}
@@ -528,7 +621,37 @@ export function AppShell() {
             <EmptyState onConnected={(id) => selectDb(id)} setDbs={setDbs} />
           ) : (
             <>
-              <div ref={scrollRef} className="scrollbar-thin flex-1 space-y-4 overflow-y-auto p-4">
+              <AnimatePresence>
+                {activeBranch && !activeBranch.isMain && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="flex items-center gap-2 overflow-hidden border-b border-primary/30 bg-primary/10 px-4 py-1.5 text-xs text-primary"
+                  >
+                    <GitBranch className="h-3.5 w-3.5" />
+                    You are on branch <span className="font-semibold">{activeBranch.name}</span> —
+                    changes here don&apos;t touch main until you merge.
+                    <button
+                      className="ml-auto underline underline-offset-2"
+                      onClick={() => {
+                        const main = branches.find((b) => b.isMain);
+                        if (main) switchBranch(main.id);
+                      }}
+                    >
+                      back to main
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <motion.div
+                key={activeBranch?.id ?? "nb"}
+                initial={{ opacity: 0.4 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                ref={scrollRef}
+                className="scrollbar-thin flex-1 space-y-4 overflow-y-auto p-4"
+              >
                 {rendered.length === 0 && !liveTurn && (
                   <div className="mx-auto max-w-lg pt-10 text-center">
                     <h2 className="text-lg font-semibold">Operate {activeDbRow?.label}</h2>
@@ -561,7 +684,7 @@ export function AppShell() {
                     onUndo={() => liveTurn.operationId && undo(liveTurn.operationId)}
                   />
                 )}
-              </div>
+              </motion.div>
 
               <div className="shrink-0 border-t p-3">
                 <div className="flex items-end gap-2">
@@ -595,18 +718,43 @@ export function AppShell() {
               <TabsTrigger value="schema" className="flex-1">
                 Schema
               </TabsTrigger>
+              <TabsTrigger value="branches" className="flex-1">
+                Branches{branches.length > 1 ? ` (${branches.length})` : ""}
+              </TabsTrigger>
               <TabsTrigger value="operations" className="flex-1">
-                Operations
+                Ops
               </TabsTrigger>
               <TabsTrigger value="mcp" className="flex-1">
                 MCP
               </TabsTrigger>
             </TabsList>
             <TabsContent value="schema" className="min-h-0 flex-1">
-              <SchemaExplorer
-                schema={schema}
-                refreshing={schemaLoading}
-                onRefresh={() => activeDb && refreshSchema(activeDb)}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeBranch?.id ?? "none"}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.18 }}
+                  className="h-full"
+                >
+                  <SchemaExplorer
+                    schema={schema}
+                    refreshing={schemaLoading}
+                    onRefresh={() => activeDb && refreshSchema(activeDb)}
+                  />
+                </motion.div>
+              </AnimatePresence>
+            </TabsContent>
+            <TabsContent value="branches" className="min-h-0 flex-1">
+              <BranchPanel
+                databaseId={activeDb}
+                branches={branches}
+                busy={busy}
+                onSwitch={switchBranch}
+                onCreate={createBranch}
+                onDiscard={discardBranch}
+                onMerged={afterMerge}
               />
             </TabsContent>
             <TabsContent value="operations" className="min-h-0 flex-1 overflow-hidden">

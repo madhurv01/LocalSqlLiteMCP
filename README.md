@@ -30,6 +30,7 @@ are protected by an automatic pre-mutation snapshot so you can **Undo / Rollback
 | | |
 |---|---|
 | **Agentic workflow** | 9-stage pipeline with streamed reasoning, streamed SQL, and a live timeline |
+| **Database branching** | fork the database into a named branch, let the agent run wild, diff branch vs. main, then merge the good version back or discard it — like `git branch` for your data |
 | **Truthful preview** | every plan runs first against a throwaway in-memory clone — you see the real result, real schema/row diff, real verification outcomes, real failures — before anything touches your database |
 | **Safe by construction** | static SQL analysis, risk scoring, hard-blocked statements, parameterised reads, transaction boundaries, read/write separation |
 | **Command palette** | ⌘K / Ctrl-K for connect, switch DB, new conversation, re-run, theme |
@@ -119,6 +120,9 @@ src/lib/
     safety.ts            statement splitter, classifier, risk model, hard blocks
     executor.ts          parameterised run + single-transaction batch
     snapshot.ts          online-backup checkpoint + restore
+    sandbox.ts           in-memory clone for the truthful preview
+    clone.ts             VACUUM INTO file / in-memory copy helpers
+  branching.ts           fork / switch / compare / merge / discard branches
   mcp/
     tools.ts             the canonical capability layer (Zod-validated)
     server.ts            MCP server wrapper
@@ -145,6 +149,25 @@ verification results. Nothing is written back. If the plan would fail (constrain
 violation, bad column, …) the pipeline stops at **Preview** and never creates a
 mutating operation. Databases larger than `LOCALDB_SANDBOX_MAX_MB` skip the clone and
 fall back to static analysis.
+
+### Branching & merge
+
+`lib/branching.ts` completes the "Git for database operations" metaphor:
+
+- **Fork** — `createBranch` copies the active branch's file (`VACUUM INTO`) into
+  `data/branches/`, records the parent and the parent's schema at fork time. Instant, and
+  the parent is untouched.
+- **Work** — the branch switcher swaps which file the pipeline operates on. Every operation
+  is tagged with its `branchId`; history, undo and schema are all branch-scoped.
+- **Compare** — `compareBranch` reuses `diffSchemas` + row-count deltas to show
+  branch-vs-parent, plus the list of operations that ran on the branch.
+- **Merge** — `mergeBranch` first checks the parent hasn't diverged structurally since the
+  fork (else it flags a conflict), previews the combined statements on a sandbox copy of
+  the parent, then on confirm replays them onto the parent in one transaction with a
+  snapshot — so a merge is itself undoable.
+- **Discard** — deletes the branch file and its operations; `main` never knew it existed.
+
+Branch files live under `LOCALDB_DATA_DIR/branches/` and are cleaned up on discard.
 
 ### Safety model
 

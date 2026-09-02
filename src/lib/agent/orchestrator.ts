@@ -51,6 +51,7 @@ function impactLine(p: PreviewResult): string {
 export interface OrchestratorInput {
   databaseId: string;
   databasePath: string;
+  branchId?: string | null;
   conversationId: string;
   message: string;
   history: { role: "user" | "assistant"; content: string }[];
@@ -223,6 +224,7 @@ export async function* runPipeline(input: OrchestratorInput): AsyncGenerator<Age
       const opId = repo.createOperation({
         databaseId: input.databaseId,
         conversationId: input.conversationId,
+        branchId: input.branchId ?? null,
         intent: plan.intent,
         plan,
         schemaBefore: before,
@@ -262,6 +264,7 @@ export async function* runPipeline(input: OrchestratorInput): AsyncGenerator<Age
       const opId = repo.createOperation({
         databaseId: input.databaseId,
         conversationId: input.conversationId,
+        branchId: input.branchId ?? null,
         intent: plan.intent,
         plan,
         schemaBefore: before,
@@ -282,6 +285,7 @@ export async function* runPipeline(input: OrchestratorInput): AsyncGenerator<Age
     const opId = repo.createOperation({
       databaseId: input.databaseId,
       conversationId: input.conversationId,
+      branchId: input.branchId ?? null,
       intent: plan.intent,
       plan,
       schemaBefore: before,
@@ -314,11 +318,13 @@ export async function* executeOperation(operationId: string): AsyncGenerator<Age
     yield { type: "error", message: "Database no longer registered." };
     return;
   }
+  const branch = op.branchId ? repo.getBranch(op.branchId) : null;
+  const dbPath = branch?.filePath ?? database.path;
   const mcp = new LocalMcpClient();
   const statements = plan.statements.map((s) => s.sql);
   const schemaBefore: SchemaSnapshot = op.schemaBefore
     ? JSON.parse(op.schemaBefore)
-    : mcp.invoke<SchemaSnapshot>("schema_snapshot", { databasePath: database.path });
+    : mcp.invoke<SchemaSnapshot>("schema_snapshot", { databasePath: dbPath });
 
   repo.setOperationStatus(operationId, "executing");
 
@@ -331,7 +337,7 @@ export async function* executeOperation(operationId: string): AsyncGenerator<Age
   }) | null = null;
   try {
     raw = mcp.invoke("execute", {
-      databasePath: database.path,
+      databasePath: dbPath,
       sql: statements.join(";\n"),
       confirmDestructive: true,
       snapshot: true,
@@ -392,7 +398,7 @@ export async function* executeOperation(operationId: string): AsyncGenerator<Age
   for (const v of plan.verifications) {
     try {
       const res = mcp.invoke<{ results: { rows?: Record<string, unknown>[] }[] }>("query", {
-        databasePath: database.path,
+        databasePath: dbPath,
         sql: v.sql,
         maxRows: 50,
       });
@@ -417,7 +423,7 @@ export async function* executeOperation(operationId: string): AsyncGenerator<Age
   );
 
   // 9. COMPLETE -------------------------------------------------
-  const schemaAfter = raw.schemaAfter ?? mcp.invoke<SchemaSnapshot>("schema_snapshot", { databasePath: database.path });
+  const schemaAfter = raw.schemaAfter ?? mcp.invoke<SchemaSnapshot>("schema_snapshot", { databasePath: dbPath });
   const schemaDiff = diffSchemas(schemaBefore, schemaAfter);
 
   const result: ExecutionResult = {
@@ -463,10 +469,12 @@ export function undoOperation(operationId: string): { ok: boolean; message: stri
 
   const database = repo.getDatabase(op.databaseId);
   if (!database) return { ok: false, message: "Database not registered." };
+  const branch = op.branchId ? repo.getBranch(op.branchId) : null;
+  const dbPath = branch?.filePath ?? database.path;
 
   const mcp = new LocalMcpClient();
   mcp.invoke("restore_snapshot", {
-    databasePath: database.path,
+    databasePath: dbPath,
     snapshotFilePath: snap.filePath,
   });
   repo.markSnapshotConsumed(snap.id);

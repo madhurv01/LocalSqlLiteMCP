@@ -5,7 +5,11 @@ export const runtime = "nodejs";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const ops = repo.listOperations(id).map((o) => ({
+  const active = repo.getActiveBranch(id);
+  const rows = active
+    ? repo.listBranchOperations(id, active.id, active.isMain).slice().reverse()
+    : repo.listOperations(id);
+  const ops = rows.map((o) => ({
     id: o.id,
     status: o.status,
     intent: o.intent,

@@ -1,7 +1,8 @@
 import Database from "better-sqlite3";
-import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { join } from "node:path";
 import { nanoid } from "nanoid";
+import { loadInMemoryCopy } from "./clone";
 import type {
   PreviewResult,
   RowDelta,
@@ -81,29 +82,14 @@ export function runInSandbox(
   }
 
   // --- clone -----------------------------------------------------------
-  // `VACUUM INTO` writes a complete, consistent copy (including WAL state)
-  // to a scratch file. We load it fully into memory and delete the file, so
-  // the sandbox leaves nothing on disk and never touches the real database.
+  // A private, in-memory copy — the sandbox leaves nothing on disk and never
+  // touches the real database.
   let clone: Database.Database;
-  const scratch = join(config.sandboxDir, `preview_${nanoid(10)}.db`);
   try {
-    let bytes = Buffer.alloc(0);
-    if (existsSync(abs)) {
-      const src = new Database(abs, { readonly: true });
-      src.exec(`VACUUM INTO '${scratch.replace(/'/g, "''")}'`);
-      src.close();
-      bytes = readFileSync(scratch);
-    }
-    clone = bytes.length >= 512 ? new Database(bytes) : new Database(":memory:");
+    clone = loadInMemoryCopy(abs, join(config.sandboxDir, `preview_${nanoid(10)}.db`));
   } catch (err) {
     logger.warn("sandbox clone failed, static preview", { err: String(err) });
     return { ...base, skippedReason: `Could not clone database: ${(err as Error).message}` };
-  } finally {
-    try {
-      if (existsSync(scratch)) rmSync(scratch);
-    } catch {
-      /* ignore */
-    }
   }
   clone.pragma("foreign_keys = ON");
 

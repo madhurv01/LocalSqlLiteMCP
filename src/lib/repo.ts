@@ -37,6 +37,69 @@ export const repo = {
       .where(eq(schema.databases.id, id))
       .run();
   },
+  setActiveBranch(databaseId: string, branchId: string) {
+    db()
+      .update(schema.databases)
+      .set({ activeBranchId: branchId })
+      .where(eq(schema.databases.id, databaseId))
+      .run();
+  },
+
+  // ---- branches ------------------------------------------------------
+  listBranches(databaseId: string) {
+    return db()
+      .select()
+      .from(schema.branches)
+      .where(eq(schema.branches.databaseId, databaseId))
+      .orderBy(schema.branches.createdAt)
+      .all();
+  },
+  getBranch(id: string) {
+    return db().select().from(schema.branches).where(eq(schema.branches.id, id)).get();
+  },
+  insertBranch(row: typeof schema.branches.$inferInsert) {
+    db().insert(schema.branches).values(row).run();
+    return this.getBranch(row.id)!;
+  },
+  updateBranch(id: string, patch: Partial<typeof schema.branches.$inferInsert>) {
+    db().update(schema.branches).set(patch).where(eq(schema.branches.id, id)).run();
+  },
+  deleteBranch(id: string) {
+    db().delete(schema.operations).where(eq(schema.operations.branchId, id)).run();
+    db().delete(schema.branches).where(eq(schema.branches.id, id)).run();
+  },
+  /** The main branch for a database, creating its row on first access. */
+  ensureMainBranch(databaseId: string) {
+    const existing = db()
+      .select()
+      .from(schema.branches)
+      .where(and(eq(schema.branches.databaseId, databaseId), eq(schema.branches.isMain, true)))
+      .get();
+    if (existing) return existing;
+    const database = this.getDatabase(databaseId)!;
+    const id = `br_${nanoid(10)}`;
+    const branch = this.insertBranch({
+      id,
+      databaseId,
+      name: "main",
+      parentBranchId: null,
+      filePath: database.path,
+      isMain: true,
+      status: "active",
+    });
+    if (!database.activeBranchId) this.setActiveBranch(databaseId, id);
+    return branch;
+  },
+  /** Currently checked-out branch (falls back to / creates main). */
+  getActiveBranch(databaseId: string) {
+    const database = this.getDatabase(databaseId);
+    if (!database) return null;
+    if (database.activeBranchId) {
+      const b = this.getBranch(database.activeBranchId);
+      if (b) return b;
+    }
+    return this.ensureMainBranch(databaseId);
+  },
 
   // ---- conversations --------------------------------------------------
   listConversations(databaseId: string) {
@@ -86,6 +149,7 @@ export const repo = {
   createOperation(input: {
     databaseId: string;
     conversationId?: string;
+    branchId?: string | null;
     intent: string;
     plan: AgentPlan;
     schemaBefore: SchemaSnapshot;
@@ -99,6 +163,7 @@ export const repo = {
         id,
         databaseId: input.databaseId,
         conversationId: input.conversationId,
+        branchId: input.branchId ?? null,
         intent: input.intent,
         risk: input.plan.risk,
         plan: JSON.stringify(input.plan),
@@ -127,6 +192,18 @@ export const repo = {
       .orderBy(desc(schema.operations.createdAt))
       .limit(limit)
       .all();
+  },
+  /** Operations that ran on a specific branch (main also owns legacy null rows). */
+  listBranchOperations(databaseId: string, branchId: string, isMain: boolean, limit = 200) {
+    const rows = db()
+      .select()
+      .from(schema.operations)
+      .where(eq(schema.operations.databaseId, databaseId))
+      .orderBy(schema.operations.createdAt)
+      .all();
+    return rows
+      .filter((o) => o.branchId === branchId || (isMain && o.branchId == null))
+      .slice(-limit);
   },
   finishOperation(
     id: string,

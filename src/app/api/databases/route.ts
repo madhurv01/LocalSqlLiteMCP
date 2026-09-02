@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     const record = repo.registerDatabase(abs, label);
+    repo.ensureMainBranch(record.id);
     const db = openUserDb(abs, { readonly: true });
     return NextResponse.json({ database: record, schema: captureSchema(db) });
   } catch (err) {

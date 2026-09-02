@@ -18,8 +18,9 @@ const dataDir = resolve(process.cwd(), process.env.LOCALDB_DATA_DIR || "data");
 const dbRoot = resolve(process.cwd(), process.env.LOCALDB_DB_ROOT || "databases");
 const snapshotDir = resolve(dataDir, "snapshots");
 const sandboxDir = resolve(dataDir, "sandboxes");
+const branchDir = resolve(dataDir, "branches");
 
-for (const dir of [dataDir, dbRoot, snapshotDir, sandboxDir]) {
+for (const dir of [dataDir, dbRoot, snapshotDir, sandboxDir, branchDir]) {
   try {
     mkdirSync(dir, { recursive: true });
   } catch {
@@ -32,6 +33,7 @@ export const config = {
   dbRoot,
   snapshotDir,
   sandboxDir,
+  branchDir,
   appDbPath: process.env.APP_DB_PATH || resolve(dataDir, "app.db"),
   llmProvider: (process.env.LLM_PROVIDER || "heuristic").toLowerCase(),
   ollama: {

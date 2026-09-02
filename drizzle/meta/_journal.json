@@ -15,6 +15,13 @@
       "when": 1788196608332,
       "tag": "0001_needy_xavin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788366086162,
+      "tag": "0002_blushing_kid_colt",
+      "breakpoints": true
     }
   ]
 }

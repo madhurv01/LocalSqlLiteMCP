@@ -5,9 +5,21 @@ const ALLOWED_EXT = new Set([".db", ".sqlite", ".sqlite3"]);
 
 export class PathSafetyError extends Error {}
 
+/** Roots a database file is allowed to live under. */
+function allowedRoots(): string[] {
+  return [config.dbRoot, config.branchDir, config.snapshotDir];
+}
+
+function underRoot(abs: string, root: string): boolean {
+  const rel = relative(root, abs);
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel) && !rel.split(sep).includes("..");
+}
+
 /**
- * Resolve a user-supplied database path against LOCALDB_DB_ROOT and reject
- * anything that escapes the root, uses a disallowed extension, or is a URI.
+ * Resolve a user-supplied database path. A bare/relative path resolves against
+ * LOCALDB_DB_ROOT. Absolute paths are accepted only if they sit inside one of
+ * the allowed roots (the DB root, or the app's branch/snapshot dirs). URIs,
+ * traversal and non-sqlite extensions are rejected.
  */
 export function resolveDbPath(input: string): string {
   const raw = input.trim();
@@ -18,15 +30,11 @@ export function resolveDbPath(input: string): string {
   if (raw.includes("\0")) throw new PathSafetyError("Invalid path.");
 
   const abs = isAbsolute(raw) ? resolve(raw) : resolve(config.dbRoot, raw);
-  const rel = relative(config.dbRoot, abs);
 
-  if (rel === "" || rel.startsWith("..") || (isAbsolute(rel))) {
+  if (!allowedRoots().some((root) => underRoot(abs, root))) {
     throw new PathSafetyError(
-      `Path escapes the database root (${config.dbRoot}). Place the file inside it.`,
+      `Path is outside the allowed roots (${config.dbRoot}). Place the file inside it.`,
     );
-  }
-  if (rel.split(sep).some((seg) => seg === "..")) {
-    throw new PathSafetyError("Path traversal detected.");
   }
 
   const ext = extname(abs).toLowerCase();
@@ -39,6 +47,5 @@ export function resolveDbPath(input: string): string {
 }
 
 export function isInsideDbRoot(abs: string): boolean {
-  const rel = relative(config.dbRoot, resolve(abs));
-  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+  return underRoot(resolve(abs), config.dbRoot);
 }

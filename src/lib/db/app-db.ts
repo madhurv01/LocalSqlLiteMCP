@@ -18,8 +18,23 @@ CREATE TABLE IF NOT EXISTS databases (
   id TEXT PRIMARY KEY,
   label TEXT NOT NULL,
   path TEXT NOT NULL UNIQUE,
+  active_branch_id TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   last_used_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TABLE IF NOT EXISTS branches (
+  id TEXT PRIMARY KEY,
+  database_id TEXT NOT NULL REFERENCES databases(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  parent_branch_id TEXT,
+  file_path TEXT NOT NULL,
+  is_main INTEGER NOT NULL DEFAULT 0,
+  base_schema TEXT,
+  forked_from_operation_id TEXT,
+  status TEXT NOT NULL DEFAULT 'active',
+  merged_into_branch_id TEXT,
+  merged_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE TABLE IF NOT EXISTS conversations (
   id TEXT PRIMARY KEY,
@@ -91,8 +106,10 @@ function runInlineMigrations(db: Database.Database) {
   };
   try {
     addColumn("operations", "preview_result", "preview_result TEXT");
+    addColumn("operations", "branch_id", "branch_id TEXT");
+    addColumn("databases", "active_branch_id", "active_branch_id TEXT");
   } catch {
-    /* fresh db — column already present via bootstrap */
+    /* fresh db — columns already present via bootstrap */
   }
 }
 

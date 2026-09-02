@@ -119,6 +119,29 @@ export interface ErrorEvent {
 
 export type AgentEvent = StageEvent | TokenEvent | SqlDraftEvent | DoneEvent | ErrorEvent;
 
+export interface BranchView {
+  id: string;
+  name: string;
+  isMain: boolean;
+  isActive: boolean;
+  parentBranchId: string | null;
+  status: string;
+  createdAt: string;
+  operationCount: number;
+  tableCount: number;
+  rowCount: number;
+  aheadBy: number;
+  exists: boolean;
+}
+
+export interface BranchComparison {
+  branch: string;
+  parent: string;
+  schemaDiff: SchemaDiff;
+  rowDeltas: { table: string; parent: number; branch: number }[];
+  operations: { id: string; intent: string; risk: string; status: string; createdAt: string }[];
+}
+
 export interface RowDelta {
   table: string;
   before: number;

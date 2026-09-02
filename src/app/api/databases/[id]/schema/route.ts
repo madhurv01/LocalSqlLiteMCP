@@ -10,7 +10,13 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params;
   const db = repo.getDatabase(id);
   if (!db) return NextResponse.json({ error: "Unknown database" }, { status: 404 });
-  if (!existsSync(db.path)) return NextResponse.json({ error: "File missing on disk" }, { status: 410 });
-  const conn = openUserDb(db.path, { readonly: true });
-  return NextResponse.json({ schema: captureSchema(conn) });
+
+  const branch = repo.getActiveBranch(id);
+  const path = branch?.filePath ?? db.path;
+  if (!existsSync(path)) return NextResponse.json({ error: "File missing on disk" }, { status: 410 });
+  const conn = openUserDb(path, { readonly: true });
+  return NextResponse.json({
+    schema: captureSchema(conn),
+    branch: branch ? { id: branch.id, name: branch.name, isMain: branch.isMain } : null,
+  });
 }
