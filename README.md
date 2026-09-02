@@ -37,6 +37,7 @@ are protected by an automatic pre-mutation snapshot so you can **Undo / Rollback
 | **Snapshots & undo** | online-backup checkpoint before every mutation; one-click rollback |
 | **Schema intelligence** | explorer with tables / columns / row counts / indexes / FKs, and structural before/after diffs |
 | **MCP-native** | the database capability layer is a standalone MCP server — external clients get the same guarantees |
+| **Single- or multi-user** | zero-auth by default; flip `AUTH_MODE` to `header` / `oauth` for private per-user workspaces with uploads and quotas |
 | **Free by default** | offline heuristic planner needs no API key; optional Ollama / Anthropic / OpenAI |
 | **Polished UI** | Next.js + shadcn-style components + Framer Motion, dark/light, responsive |
 
@@ -100,9 +101,15 @@ All optional — see [`.env.example`](.env.example). Key variables:
 | `LOCALDB_SANDBOX_MAX_MB` | `200` | skip the clone above this DB size (static preview only) |
 | `LOCALDB_SANDBOX_SAMPLE_ROWS` | `10` | sample changed rows shown from a preview |
 | `LOCALDB_REQUIRE_CONFIRM_ALL` | `false` | require confirmation for every mutating op, not just risky ones |
+| `AUTH_MODE` | `single` | `single` \| `header` \| `oauth` — see [DEPLOYMENT.md](DEPLOYMENT.md#5-multi-user) |
+| `LOCALDB_MAX_DBS_PER_USER` / `_MAX_DB_MB` / `_MAX_USER_MB` | `10` / `50` / `200` | per-user quotas (header/oauth mode) |
 
 If a configured LLM is unreachable, the app automatically falls back to the offline
 heuristic planner and tells you in the UI.
+
+For a **hosted multi-user** deployment (private per-user workspaces, browser uploads,
+GitHub/Google sign-in or a trusted proxy header, quotas) see
+[DEPLOYMENT.md](DEPLOYMENT.md).
 
 ---
 
@@ -125,6 +132,8 @@ src/lib/
     sandbox.ts           in-memory clone for the truthful preview
     clone.ts             VACUUM INTO file / in-memory copy helpers
   branching.ts           fork / switch / compare / merge / discard branches
+  auth.ts / auth-oauth.ts  pluggable identity (single | header | oauth)
+  quota.ts               per-user database / disk / rate limits
   mcp/
     tools.ts             the canonical capability layer (Zod-validated)
     server.ts            MCP server wrapper

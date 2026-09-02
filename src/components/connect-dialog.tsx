@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Database, FilePlus2, HardDrive, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Database, FilePlus2, HardDrive, Loader2, Upload } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -56,6 +56,8 @@ export function ConnectDialog({
       .catch((e) => setError(String(e)));
   }, [open]);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   async function connect(body: unknown) {
     setBusy(true);
     setError(null);
@@ -73,6 +75,26 @@ export function ConnectDialog({
     }
   }
 
+  async function upload(file: File) {
+    setBusy(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await jsonFetch<{ database: { id: string } }>("/api/databases/upload", {
+        method: "POST",
+        body: fd,
+      });
+      onConnected(r.database.id);
+      setOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
@@ -82,20 +104,50 @@ export function ConnectDialog({
             <Database className="h-4 w-4" /> Connect a SQLite database
           </DialogTitle>
           <DialogDescription>
-            Files are read from the sandbox root <code className="font-mono">{root}</code>. Paths
-            outside it are rejected.
+            Databases live in your private workspace. Upload one from your computer, create a fresh
+            one, or reopen an existing file.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="pick">
+        <Tabs defaultValue="upload">
           <TabsList className="w-full">
-            <TabsTrigger value="pick" className="flex-1">
-              <HardDrive className="h-3.5 w-3.5" /> Pick existing
+            <TabsTrigger value="upload" className="flex-1">
+              <Upload className="h-3.5 w-3.5" /> Upload
             </TabsTrigger>
             <TabsTrigger value="create" className="flex-1">
               <FilePlus2 className="h-3.5 w-3.5" /> Create new
             </TabsTrigger>
+            <TabsTrigger value="pick" className="flex-1">
+              <HardDrive className="h-3.5 w-3.5" /> Workspace
+            </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="upload" className="mt-3 space-y-3">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-8 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent/40 disabled:opacity-50"
+            >
+              {busy ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                <Upload className="h-6 w-6 text-primary" />
+              )}
+              <span>Choose a .db / .sqlite file from your computer</span>
+              <span className="text-[11px]">It is copied into your private workspace.</span>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".db,.sqlite,.sqlite3"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) upload(f);
+              }}
+            />
+          </TabsContent>
 
           <TabsContent value="pick" className="mt-3 space-y-2">
             <div className="scrollbar-thin max-h-60 space-y-1 overflow-y-auto">

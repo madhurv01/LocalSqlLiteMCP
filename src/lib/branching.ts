@@ -1,4 +1,4 @@
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { nanoid } from "nanoid";
 import { config } from "@/lib/config";
@@ -90,6 +90,12 @@ export function createBranch(
   const id = `br_${nanoid(10)}`;
   const filePath = branchFile(databaseId, id);
   cloneDatabaseToFile(source.filePath, filePath);
+  let sizeBytes = 0;
+  try {
+    sizeBytes = statSync(filePath).size;
+  } catch {
+    /* ignore */
+  }
 
   const baseSchema = captureSchema(openUserDb(source.filePath, { readonly: true }));
   const sourceOps = repo.listBranchOperations(databaseId, source.id, source.isMain);
@@ -99,6 +105,7 @@ export function createBranch(
     name: clean,
     parentBranchId: source.id,
     filePath,
+    sizeBytes,
     isMain: false,
     baseSchema: JSON.stringify(baseSchema),
     forkedFromOperationId: sourceOps.at(-1)?.id ?? null,

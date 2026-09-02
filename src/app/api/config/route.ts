@@ -11,7 +11,7 @@ export async function GET() {
     configuredProvider: config.llmProvider,
     activeProvider: provider.name,
     usingFallback: fellBack,
-    dbRoot: config.dbRoot,
+    authMode: config.authMode,
     maxPreviewRows: config.maxPreviewRows,
     mcpTools: Object.entries(toolRegistry).map(([name, d]) => ({ name, description: d.description })),
   });

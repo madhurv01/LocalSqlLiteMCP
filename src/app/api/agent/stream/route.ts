@@ -4,6 +4,8 @@ import { chatRequestSchema } from "@/lib/validation";
 import { repo } from "@/lib/repo";
 import { runPipeline } from "@/lib/agent/orchestrator";
 import { sseResponse } from "@/lib/sse";
+import { authGate } from "@/lib/auth";
+import { assertRate, LimitError } from "@/lib/quota";
 import type { AgentEvent } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -11,14 +13,23 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
+  const gate = await authGate(req);
+  if (gate instanceof Response) return gate;
+  try {
+    assertRate(gate.id);
+  } catch (err) {
+    if (err instanceof LimitError) return err.response;
+    throw err;
+  }
+
   const parsed = chatRequestSchema.safeParse(await req.json());
   if (!parsed.success) {
     return Response.json({ error: "Invalid request", detail: parsed.error.flatten() }, { status: 400 });
   }
   const { databaseId, message } = parsed.data;
 
-  const database = repo.getDatabase(databaseId);
-  if (!database) return Response.json({ error: "Unknown database" }, { status: 404 });
+  const database = repo.getOwnedDatabase(databaseId, gate.id);
+  if (!database) return Response.json({ error: "Not found" }, { status: 404 });
   if (!existsSync(database.path)) {
     return Response.json({ error: "Database file is missing on disk" }, { status: 410 });
   }

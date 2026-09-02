@@ -15,6 +15,7 @@ import {
   Server,
   TerminalSquare,
   Trash2,
+  UserRound,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button, Card, Input, Separator, Textarea } from "@/components/ui/primitives";
@@ -31,7 +32,7 @@ import { jsonFetch, streamAgent } from "@/lib/client-api";
 import { emptyTurn, reduceTurn, turnFromMeta, type AgentTurn } from "@/lib/turn";
 import { suggestFollowUps } from "@/lib/suggest";
 import type { BranchView, SchemaSnapshot } from "@/lib/types";
-import { cn, relativeTime } from "@/lib/utils";
+import { cn, formatBytes, relativeTime } from "@/lib/utils";
 
 interface DbRow {
   id: string;
@@ -56,7 +57,17 @@ interface ConfigInfo {
   configuredProvider: string;
   activeProvider: string;
   usingFallback: boolean;
+  authMode: string;
   mcpTools: { name: string; description: string }[];
+}
+interface MeInfo {
+  authMode: string;
+  authenticated: boolean;
+  user: { id: string; email: string | null; name: string | null } | null;
+  quota: {
+    databases: { used: number; limit: number };
+    disk: { usedBytes: number; limitBytes: number };
+  } | null;
 }
 
 const EXAMPLES = [
@@ -77,6 +88,7 @@ export function AppShell() {
   const [operations, setOperations] = useState<OperationSummary[]>([]);
   const [branches, setBranches] = useState<BranchView[]>([]);
   const [cfg, setCfg] = useState<ConfigInfo | null>(null);
+  const [me, setMe] = useState<MeInfo | null>(null);
   const [input, setInput] = useState("");
   const [liveTurn, setLiveTurn] = useState<AgentTurn | null>(null);
   const [busy, setBusy] = useState(false);
@@ -92,9 +104,14 @@ export function AppShell() {
     setTimeout(() => setToast(null), 3500);
   };
 
+  const refreshMe = useCallback(() => {
+    jsonFetch<MeInfo>("/api/me").then(setMe).catch(() => {});
+  }, []);
+
   // ---- bootstrap ----------------------------------------------------
   useEffect(() => {
     jsonFetch<ConfigInfo>("/api/config").then(setCfg).catch(() => {});
+    refreshMe();
     jsonFetch<{ databases: DbRow[] }>("/api/databases")
       .then((r) => {
         setDbs(r.databases);
@@ -298,6 +315,7 @@ export function AppShell() {
       setLiveTurn({ ...turn });
     } finally {
       setBusy(false);
+      refreshMe();
       if (activeDb) {
         await refreshSchema(activeDb);
         await refreshOps(activeDb);
@@ -535,6 +553,33 @@ export function AppShell() {
               <Server className="h-3 w-3" /> {cfg.activeProvider}
               {cfg.usingFallback && " (fallback)"}
             </span>
+          )}
+          {me && me.authMode !== "single" && me.user && (
+            <div className="hidden items-center gap-2 md:flex">
+              {me.quota && (
+                <span
+                  className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground"
+                  title="Your workspace usage"
+                >
+                  {me.quota.databases.used}/{me.quota.databases.limit} DBs ·{" "}
+                  {formatBytes(me.quota.disk.usedBytes)}/{formatBytes(me.quota.disk.limitBytes)}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <UserRound className="h-3.5 w-3.5" />
+                <span className="max-w-[140px] truncate">{me.user.email ?? me.user.name}</span>
+              </span>
+              {me.authMode === "oauth" && (
+                <button
+                  onClick={() => {
+                    window.location.href = "/api/auth/signout";
+                  }}
+                  className="text-xs text-muted-foreground underline"
+                >
+                  Sign out
+                </button>
+              )}
+            </div>
           )}
           <ThemeToggle />
         </div>

@@ -26,7 +26,7 @@ describe("database branching", () => {
       confirmDestructive: false,
       snapshot: false,
     });
-    const database = repo.registerDatabase(dbPath, "app");
+    const database = repo.registerDatabase("local", dbPath, "app");
     const main = repo.ensureMainBranch(database.id);
 
     // fork
@@ -81,7 +81,7 @@ describe("database branching", () => {
 
     const dbPath = join(tmp, "conflict.db");
     tool_execute({ databasePath: dbPath, sql: "CREATE TABLE t (id INT)", confirmDestructive: false, snapshot: false });
-    const database = repo.registerDatabase(dbPath, "conflict");
+    const database = repo.registerDatabase("local", dbPath, "conflict");
     repo.ensureMainBranch(database.id);
     const br = createBranch(database.id, "feature");
 

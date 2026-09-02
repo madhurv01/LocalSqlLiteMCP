@@ -5,6 +5,8 @@ const now = sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`;
 
 export const databases = sqliteTable("databases", {
   id: text("id").primaryKey(),
+  /** Owning user id ("local" for single-user mode). */
+  ownerId: text("owner_id").notNull().default("local"),
   label: text("label").notNull(),
   /** Absolute, validated path on disk (the "main" branch file). */
   path: text("path").notNull().unique(),
@@ -23,6 +25,8 @@ export const branches = sqliteTable("branches", {
   parentBranchId: text("parent_branch_id"),
   /** Absolute path to this branch's own .db file (main points at databases.path). */
   filePath: text("file_path").notNull(),
+  /** Size of this branch's file at fork time — for per-user disk accounting. */
+  sizeBytes: integer("size_bytes").notNull().default(0),
   isMain: integer("is_main", { mode: "boolean" }).notNull().default(false),
   /** JSON SchemaSnapshot of the parent at fork time — used for merge conflict checks. */
   baseSchema: text("base_schema"),

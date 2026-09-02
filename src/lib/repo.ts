@@ -1,5 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { statSync } from "node:fs";
 import { getAppDb, schema } from "@/lib/db/app-db";
 import type { AgentPlan, ExecutionResult, PreviewResult, SchemaSnapshot } from "@/lib/types";
 
@@ -7,16 +8,25 @@ const db = () => getAppDb();
 
 export const repo = {
   // ---- databases -------------------------------------------------------
-  listDatabases() {
-    return db().select().from(schema.databases).orderBy(desc(schema.databases.lastUsedAt)).all();
+  listDatabases(ownerId?: string) {
+    const q = db().select().from(schema.databases);
+    const rows = ownerId
+      ? q.where(eq(schema.databases.ownerId, ownerId)).all()
+      : q.all();
+    return rows.sort((a, b) => b.lastUsedAt.localeCompare(a.lastUsedAt));
   },
   getDatabase(id: string) {
     return db().select().from(schema.databases).where(eq(schema.databases.id, id)).get();
   },
+  /** Same as getDatabase but returns undefined if the caller does not own it. */
+  getOwnedDatabase(id: string, ownerId: string) {
+    const row = this.getDatabase(id);
+    return row && row.ownerId === ownerId ? row : undefined;
+  },
   getDatabaseByPath(path: string) {
     return db().select().from(schema.databases).where(eq(schema.databases.path, path)).get();
   },
-  registerDatabase(path: string, label: string) {
+  registerDatabase(ownerId: string, path: string, label: string) {
     const existing = this.getDatabaseByPath(path);
     if (existing) {
       db()
@@ -27,8 +37,25 @@ export const repo = {
       return existing;
     }
     const id = `db_${nanoid(10)}`;
-    db().insert(schema.databases).values({ id, path, label }).run();
+    db().insert(schema.databases).values({ id, ownerId, path, label }).run();
     return this.getDatabase(id)!;
+  },
+  /** Total bytes a user's databases + branch files + snapshots occupy. */
+  userDiskUsage(ownerId: string): number {
+    const dbs = this.listDatabases(ownerId);
+    let total = 0;
+    for (const d of dbs) {
+      try {
+        total += statSync(d.path).size;
+      } catch {
+        /* file may not exist yet */
+      }
+      for (const b of this.listBranches(d.id)) {
+        if (!b.isMain) total += b.sizeBytes;
+      }
+      for (const s of this.listSnapshots(d.id)) total += s.sizeBytes;
+    }
+    return total;
   },
   touchDatabase(id: string) {
     db()
@@ -56,6 +83,11 @@ export const repo = {
   },
   getBranch(id: string) {
     return db().select().from(schema.branches).where(eq(schema.branches.id, id)).get();
+  },
+  getOwnedBranch(id: string, ownerId: string) {
+    const b = this.getBranch(id);
+    if (!b) return undefined;
+    return this.getOwnedDatabase(b.databaseId, ownerId) ? b : undefined;
   },
   insertBranch(row: typeof schema.branches.$inferInsert) {
     db().insert(schema.branches).values(row).run();
@@ -109,6 +141,14 @@ export const repo = {
       .where(eq(schema.conversations.databaseId, databaseId))
       .orderBy(desc(schema.conversations.createdAt))
       .all();
+  },
+  getConversation(id: string) {
+    return db().select().from(schema.conversations).where(eq(schema.conversations.id, id)).get();
+  },
+  getOwnedConversation(id: string, ownerId: string) {
+    const c = this.getConversation(id);
+    if (!c) return undefined;
+    return this.getOwnedDatabase(c.databaseId, ownerId) ? c : undefined;
   },
   createConversation(databaseId: string, title = "New conversation") {
     const id = `conv_${nanoid(10)}`;
@@ -183,6 +223,11 @@ export const repo = {
   },
   getOperation(id: string) {
     return db().select().from(schema.operations).where(eq(schema.operations.id, id)).get();
+  },
+  getOwnedOperation(id: string, ownerId: string) {
+    const op = this.getOperation(id);
+    if (!op) return undefined;
+    return this.getOwnedDatabase(op.databaseId, ownerId) ? op : undefined;
   },
   listOperations(databaseId: string, limit = 50) {
     return db()

@@ -17,6 +17,7 @@ let _sqlite: Database.Database | null = null;
 const BOOTSTRAP_SQL = `
 CREATE TABLE IF NOT EXISTS databases (
   id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL DEFAULT 'local',
   label TEXT NOT NULL,
   path TEXT NOT NULL UNIQUE,
   active_branch_id TEXT,
@@ -29,6 +30,7 @@ CREATE TABLE IF NOT EXISTS branches (
   name TEXT NOT NULL,
   parent_branch_id TEXT,
   file_path TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL DEFAULT 0,
   is_main INTEGER NOT NULL DEFAULT 0,
   base_schema TEXT,
   forked_from_operation_id TEXT,
@@ -109,6 +111,8 @@ function runInlineMigrations(db: Database.Database) {
     addColumn("operations", "preview_result", "preview_result TEXT");
     addColumn("operations", "branch_id", "branch_id TEXT");
     addColumn("databases", "active_branch_id", "active_branch_id TEXT");
+    addColumn("databases", "owner_id", "owner_id TEXT NOT NULL DEFAULT 'local'");
+    addColumn("branches", "size_bytes", "size_bytes INTEGER NOT NULL DEFAULT 0");
   } catch {
     /* fresh db — columns already present via bootstrap */
   }

@@ -1,0 +1,32 @@
+# Fly.io deployment. See DEPLOYMENT.md §4.
+#   fly launch --no-deploy          # (or edit `app` below and skip)
+#   fly volumes create localdb_data --size 1
+#   fly deploy && fly scale count 1
+app = "localdb-agent"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  LOCALDB_DATA_DIR = "/data"
+  LOCALDB_DB_ROOT = "/data/databases"
+  LLM_PROVIDER = "heuristic"
+  # AUTH_MODE = "header"      # put Cloudflare Access / oauth2-proxy in front
+  # AUTH_MODE = "oauth"       # then set AUTH_SECRET + AUTH_GITHUB_ID/_SECRET as fly secrets
+
+[[mounts]]
+  source = "localdb_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1     # stateful: keep exactly one — do not scale out
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
