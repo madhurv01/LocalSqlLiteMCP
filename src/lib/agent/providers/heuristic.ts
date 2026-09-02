@@ -398,7 +398,11 @@ function insertRows(c: Ctx): { intent: string } | null {
         .filter((col) => !(col.primaryKey && /INT/i.test(col.type)))
         .map((col) => col.name)
     : ["name"];
-  const rows = Array.from({ length: count }, (_, i) => cols.map((col) => sampleValue(col, i)));
+  // Offset sample values past existing rows so UNIQUE columns don't collide.
+  const offset = known?.rowCount ?? 0;
+  const rows = Array.from({ length: count }, (_, i) =>
+    cols.map((col) => sampleValue(col, offset + i)),
+  );
   c.statements.push({
     sql: `INSERT INTO "${table}" (${cols.map((x) => `"${x}"`).join(", ")}) VALUES\n  ${rows
       .map((r) => `(${r.join(", ")})`)
@@ -705,12 +709,14 @@ function sampleValue(col: string, i: number): string {
   const c = col.toLowerCase();
   const first = FIRST[i % FIRST.length];
   const last = LAST[(i * 7) % LAST.length];
+  // short token keeps UNIQUE columns collision-free across repeated inserts
+  const uniq = `${i}${Math.random().toString(36).slice(2, 5)}`;
   if (/^id$/.test(c) || /_id$/.test(c)) return String(i + 1);
   if (/(full_?name|^name$|display_?name)/.test(c)) return sqlStr(`${first} ${last}`);
   if (/first_?name/.test(c)) return sqlStr(first);
   if (/last_?name|surname/.test(c)) return sqlStr(last);
-  if (/email/.test(c)) return sqlStr(`${first.toLowerCase()}.${last.toLowerCase()}${i}@${DOMAINS[i % DOMAINS.length]}`);
-  if (/user_?name|handle|slug/.test(c)) return sqlStr(`${first.toLowerCase()}_${i}`);
+  if (/email/.test(c)) return sqlStr(`${first.toLowerCase()}.${last.toLowerCase()}.${uniq}@${DOMAINS[i % DOMAINS.length]}`);
+  if (/(user_?name|handle|slug|code)/.test(c)) return sqlStr(`${first.toLowerCase()}_${uniq}`);
   if (/phone/.test(c)) return sqlStr(`+1-555-01${String(10 + (i % 90)).padStart(2, "0")}`);
   if (/city|location/.test(c)) return sqlStr(CITIES[i % CITIES.length]);
   if (/country/.test(c)) return sqlStr("US");
