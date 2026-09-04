@@ -474,4 +474,14 @@ total disk are quota-capped.
 `ATTACH` / `DETACH DATABASE`, `load_extension`, `PRAGMA writable_schema`, `VACUUM INTO` —
 blocked regardless of confirmation.
 
+**Does it modify my database while I'm just asking questions?**
+No. Read-only requests (`list tables`, `show orders`, `how many customers`) never create a
+snapshot, never open a write connection, and never appear as an undoable operation — only
+plans with at least one mutating statement do.
+
+**What happens if the server crashes mid-execution?**
+Nothing partial is ever committed: every batch runs inside one `better-sqlite3`
+transaction, so a crash or error rolls the whole statement group back atomically, and the
+pre-mutation snapshot means even a fully-applied change can still be reversed afterward.
+
 ---
