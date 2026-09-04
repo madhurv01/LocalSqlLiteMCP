@@ -475,7 +475,3 @@ total disk are quota-capped.
 blocked regardless of confirmation.
 
 ---
-
-## License
-
-MIT — see [LICENSE](LICENSE).
