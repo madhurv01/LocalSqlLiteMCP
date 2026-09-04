@@ -9,7 +9,7 @@
 # LocalDB Agent
 
 [![Build & publish Docker image](https://github.com/madhurv01/LocalSqlLiteMCP/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/madhurv01/LocalSqlLiteMCP/actions/workflows/docker-publish.yml)
-[![Docker image](https://img.shields.io/badge/ghcr.io-localsqlitemcp-blue?logo=docker)](https://github.com/madhurv01/LocalSqlLiteMCP/pkgs/container/localsqlitemcp)
+[![Docker image](https://img.shields.io/badge/ghcr.io-localsqllitemcp-blue?logo=docker)](https://github.com/madhurv01/LocalSqlLiteMCP/pkgs/container/localsqllitemcp)
 [![License: MIT](https://img.shields.io/badge/license-MIT-informational)](LICENSE)
 [![Repo](https://img.shields.io/badge/GitHub-repo-181717?logo=github)](https://github.com/madhurv01/LocalSqlLiteMCP)
 
@@ -150,13 +150,13 @@ docker compose up --build     # http://localhost:3000
 ```
 
 Or pull the image built by CI on every push
-([package page](https://github.com/madhurv01/LocalSqlLiteMCP/pkgs/container/localsqlitemcp)):
+([package page](https://github.com/madhurv01/LocalSqlLiteMCP/pkgs/container/localsqllitemcp)):
 
 ```bash
 docker run -p 3000:3000 \
   -v "$PWD/databases:/databases" \
   -v localdb-data:/data \
-  ghcr.io/madhurv01/localsqlitemcp:latest
+  ghcr.io/madhurv01/localsqllitemcp:latest
 ```
 
 `./databases` is bind-mounted; app metadata + snapshots persist in the `localdb-data`
