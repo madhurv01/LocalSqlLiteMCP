@@ -49,6 +49,7 @@ It is **not** a text-to-SQL chatbot.
 - [Data & files](#data--files)
 - [Scripts & tests](#scripts--tests)
 - [FAQ](#faq)
+- [Using it on your own machine](#using-it-on-your-own-machine)
 - [License](#license)
 
 ---
@@ -485,3 +486,55 @@ transaction, so a crash or error rolls the whole statement group back atomically
 pre-mutation snapshot means even a fully-applied change can still be reversed afterward.
 
 ---
+
+## Using it on your own machine
+
+Everything above talks to LocalDB Agent through its web UI. The exact same
+capability layer is also a local **MCP server** (`npm run mcp:stdio`), so any MCP-aware
+tool already on your machine can operate your local `.db` files too — with the identical
+safety, sandbox-preview and snapshot guarantees. No web app, no port, no browser: it's a
+process your AI client spawns and talks to over stdio.
+
+1. **Pick a database root** — a real, existing folder on disk, e.g.
+   `C:\Users\you\sqlite-projects` (Windows) or `~/sqlite-projects` (macOS/Linux). This is
+   the sandbox boundary; the server can only read/write `.db` files inside it.
+2. **Point your client at this repo's stdio entrypoint**, passing that folder as
+   `LOCALDB_DB_ROOT`:
+
+   ```json
+   {
+     "mcpServers": {
+       "localdb-agent": {
+         "command": "npx",
+         "args": ["tsx", "M:/LocalSqlLiteMCP/src/bin/mcp-stdio.ts"],
+         "env": { "LOCALDB_DB_ROOT": "C:/Users/you/sqlite-projects" }
+       }
+     }
+   }
+   ```
+
+   - **Claude Desktop** — Settings → Developer → Edit Config, add the block above to
+     `claude_desktop_config.json`, restart the app.
+   - **Claude Code (CLI)** — `claude mcp add localdb-agent -- npx tsx M:/LocalSqlLiteMCP/src/bin/mcp-stdio.ts`
+     (or add the same JSON under `mcpServers` in `.claude/settings.json` for one project).
+   - **Cursor / Windsurf** — Settings → MCP → Add server, same command/args/env.
+   - **VS Code (Claude/Copilot MCP extensions)** — add to the extension's `mcp.json` the
+     same way.
+3. **Ask it to operate a file in that folder** — from the client's normal chat: *"using
+   localdb-agent, list the tables in sales.db"* or *"create a `notes.db` with a title and
+   body column"*. The client calls `dry_run` / `preview` / `execute` on your behalf; you
+   still get transactional writes and an automatic pre-mutation snapshot for every change.
+4. **Review or undo it visually whenever you like** — run `npm run dev` once, open it
+   against the same `LOCALDB_DB_ROOT`, and check the Operations tab. The web app and the
+   stdio server share the same `LOCALDB_DATA_DIR` metadata, so every change made from
+   Claude Desktop, Cursor, or any other client shows up there with a one-click **Undo**.
+
+Because the stdio server and the web app read the same `LOCALDB_DB_ROOT` /
+`LOCALDB_DATA_DIR`, you can freely mix the two on one machine: fork a branch and run a risky
+change from Claude Desktop, then open the web UI to review the diff, merge, or roll it back.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
